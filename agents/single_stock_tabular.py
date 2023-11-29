@@ -1,7 +1,7 @@
 from collections import defaultdict
 from enum import Enum
 import random
-from typing import Tuple, Sequence, Callable
+from typing import Tuple, Sequence, Callable, Dict
 
 import numpy as np
 import pandas as pd
@@ -106,9 +106,12 @@ def softmax_normalization(actions):
 
 
 def sarsa_single_stock(env: StockPortfolioEnv, num_episodes: int, gamma: float, epsilon: float, step_size: float,
-                       stock: int = 0):
+                       stock: int = 0, q: Dict = None):
     """SARSA algorithm."""
-    Q = defaultdict(lambda: np.zeros(len(PortfolioAction)))
+    if q is None:
+        Q = defaultdict(lambda: np.zeros(len(PortfolioAction)))
+    else:
+        Q = q
     policy = create_epsilon_policy(Q, epsilon)
     episodes = []
     for _ in trange(num_episodes, desc="Episode", leave=False):
@@ -163,4 +166,4 @@ def sarsa_single_stock(env: StockPortfolioEnv, num_episodes: int, gamma: float, 
                 break
 
         episodes.append(episode)
-    return env, episodes
+    return env, episodes, Q
