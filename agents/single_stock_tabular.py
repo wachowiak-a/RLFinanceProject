@@ -20,10 +20,9 @@ def convert_prices_to_discrete_state(prev_data_df: pd.DataFrame, current_data_df
     # for x, y in zip(prev_data_df['tic'].tolist(), current_data_df['tic'].tolist()):
     #    print(x == y)
     # raise IndexError("Dfs are wrong")
-    percent_diffs = ((current_data_df['open'] - prev_data_df['open']) / prev_data_df['open']) * 100
-
+    percent_diffs = ((current_data_df['open'].to_numpy() - prev_data_df['open'].to_numpy()) / prev_data_df['open'].to_numpy()) * 100
     discrete = []
-    for dif in percent_diffs.values:
+    for dif in percent_diffs:
         if dif > 5:
             discrete.append(0)
         elif 5 > dif > 0:
@@ -164,6 +163,84 @@ def sarsa_single_stock(env: StockPortfolioEnv, num_episodes: int, gamma: float, 
 
             if done:
                 break
+
+        episodes.append(episode)
+    return env, episodes, Q
+
+
+
+def generate_episode(env: StockPortfolioEnv, policy: Callable, stock: int = 0):
+    """A function to generate one episode and collect the sequence of (s, a, r) tuples
+
+    This function will be useful for implementing the MC methods
+
+    Args:
+        env (gym.Env): a Gym API compatible environment
+        policy (Callable): A function that represents the policy.
+    """
+    episode = []
+    state = env.reset()
+    # get stock data to check movement
+    env.step(np.zeros(28))
+    previous_data = env.data
+    env.step(np.zeros(28))
+    current_data = env.data
+    percent = 0
+    S = convert_prices_to_discrete_state(prev_data_df=previous_data, current_data_df=current_data)
+
+    while True:
+        A = policy(S)
+        percent = update_single_stock_percent(percent, A)
+
+        # convert our action into the portfolio percentages
+        portfolio_breakdown = np.zeros(28)
+        portfolio_breakdown[stock] = percent
+
+        next_state, reward, done, _, _ = env.step(portfolio_breakdown)
+
+        # update ticker prices
+        previous_data = current_data
+        current_data = env.data
+
+        # create discrete next state
+        next_state = convert_prices_to_discrete_state(prev_data_df=previous_data, current_data_df=current_data)
+
+        # record information
+        episode.append((S, A, reward, percent))
+
+        if done:
+            break
+        S = next_state
+
+    return episode
+
+
+def on_policy_mc_control_single_stock(env: StockPortfolioEnv, num_episodes: int, gamma: float, epsilon: float, step_size: float,
+                       stock: int = 0, q: Dict = None):
+    if q is None:
+        Q = defaultdict(lambda: np.zeros(len(PortfolioAction)))
+    else:
+        Q = q
+    episodes = []
+    returns = defaultdict(list)
+
+    for _ in trange(num_episodes, desc="Episode", leave=False):
+        policy = create_epsilon_policy(Q, epsilon)
+
+        episode = generate_episode(env, policy, stock=stock)
+        episodes.append(episode)
+        G = 0
+        for t in range(len(episode) - 1, -1, -1):
+            G = (gamma * G) + episode[t][2]
+
+            current_state, current_action, current_reward, percent = episode[t - 1]
+
+            # Check if it's a first visit to the (state, action) pair
+            state_action = (current_state, current_action)
+            if state_action not in [(step[0], step[1]) for step in episode[:t - 1]]:
+                returns[state_action].append(G)
+                Q[current_state][current_action] = np.mean(returns[state_action])
+
 
         episodes.append(episode)
     return env, episodes, Q
