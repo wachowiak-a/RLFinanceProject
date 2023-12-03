@@ -190,8 +190,9 @@ def generate_episode(env: StockPortfolioEnv, policy: Callable, stock: int = 0):
 
     while True:
         A = policy(S)
-        percent = update_single_stock_percent(percent, A)
+        A = A.value
 
+        percent = update_single_stock_percent(percent, A)
         # convert our action into the portfolio percentages
         portfolio_breakdown = np.zeros(28)
         portfolio_breakdown[stock] = percent
@@ -207,10 +208,9 @@ def generate_episode(env: StockPortfolioEnv, policy: Callable, stock: int = 0):
 
         # record information
         episode.append((S, A, reward, percent))
-
+        S = next_state
         if done:
             break
-        S = next_state
 
     return episode
 
@@ -241,6 +241,4 @@ def on_policy_mc_control_single_stock(env: StockPortfolioEnv, num_episodes: int,
                 returns[state_action].append(G)
                 Q[current_state][current_action] = np.mean(returns[state_action])
 
-
-        episodes.append(episode)
     return env, episodes, Q
