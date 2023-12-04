@@ -82,19 +82,28 @@ def create_epsilon_policy(Q: defaultdict, epsilon: float) -> Callable:
     return get_action
 
 
-def update_single_stock_percent(perc, act):
-    if act == PortfolioAction.BUY.value:
-        perc += 0.1
-    elif act == PortfolioAction.SELL.value:
-        perc -= 0.1
-    elif act == PortfolioAction.HOLD.value:
-        perc = perc
+def update_single_stock_percent(perc, act, aggresive: bool = False):
+    if not aggresive:
+        if act == PortfolioAction.BUY.value:
+            perc += 0.1
+        elif act == PortfolioAction.SELL.value:
+            perc -= 0.1
+        elif act == PortfolioAction.HOLD.value:
+            perc = perc
 
-    if perc > 1:
-        perc = 1
-    if perc < 0:
-        perc = 0
-    return perc
+        if perc > 1:
+            perc = 1
+        if perc < 0:
+            perc = 0
+        return perc
+    if aggresive:
+        if act == PortfolioAction.BUY.value:
+            perc = 1
+        elif act == PortfolioAction.SELL.value:
+            perc = 0
+        elif act == PortfolioAction.HOLD.value:
+            perc = perc
+        return perc
 
 
 def softmax_normalization(actions):
@@ -105,7 +114,7 @@ def softmax_normalization(actions):
 
 
 def sarsa_single_stock(env: StockPortfolioEnv, num_episodes: int, gamma: float, epsilon: float, step_size: float,
-                       stock: int = 0, q: Dict = None):
+                       stock: int = 0, q: Dict = None, aggressive: bool = False):
     """SARSA algorithm."""
     if q is None:
         Q = defaultdict(lambda: np.zeros(len(PortfolioAction)))
@@ -131,7 +140,7 @@ def sarsa_single_stock(env: StockPortfolioEnv, num_episodes: int, gamma: float, 
         percent = 0
         while True:
             # need to convert buy sell hold into a percentage for env step
-            percent = update_single_stock_percent(percent, A)
+            percent = update_single_stock_percent(percent, A, aggresive=aggressive)
 
             # convert our action into the portfolio percentages
             portfolio_breakdown = np.zeros(28)
@@ -169,7 +178,7 @@ def sarsa_single_stock(env: StockPortfolioEnv, num_episodes: int, gamma: float, 
 
 
 
-def generate_episode(env: StockPortfolioEnv, policy: Callable, stock: int = 0):
+def generate_episode(env: StockPortfolioEnv, policy: Callable, stock: int = 0, aggressive:bool = False):
     """A function to generate one episode and collect the sequence of (s, a, r) tuples
 
     This function will be useful for implementing the MC methods
@@ -192,7 +201,7 @@ def generate_episode(env: StockPortfolioEnv, policy: Callable, stock: int = 0):
         A = policy(S)
         A = A.value
 
-        percent = update_single_stock_percent(percent, A)
+        percent = update_single_stock_percent(percent, A, aggresive=aggressive)
         # convert our action into the portfolio percentages
         portfolio_breakdown = np.zeros(28)
         portfolio_breakdown[stock] = percent
@@ -216,7 +225,7 @@ def generate_episode(env: StockPortfolioEnv, policy: Callable, stock: int = 0):
 
 
 def on_policy_mc_control_single_stock(env: StockPortfolioEnv, num_episodes: int, gamma: float, epsilon: float, step_size: float,
-                       stock: int = 0, q: Dict = None):
+                       stock: int = 0, q: Dict = None, aggressive: bool =False):
     if q is None:
         Q = defaultdict(lambda: np.zeros(len(PortfolioAction)))
     else:
@@ -227,7 +236,7 @@ def on_policy_mc_control_single_stock(env: StockPortfolioEnv, num_episodes: int,
     for _ in trange(num_episodes, desc="Episode", leave=False):
         policy = create_epsilon_policy(Q, epsilon)
 
-        episode = generate_episode(env, policy, stock=stock)
+        episode = generate_episode(env, policy, stock=stock, aggressive=aggressive)
         episodes.append(episode)
         G = 0
         for t in range(len(episode) - 1, -1, -1):
