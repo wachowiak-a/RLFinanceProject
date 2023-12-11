@@ -252,12 +252,12 @@ def on_policy_mc_control_single_stock(env: StockPortfolioEnv, num_episodes: int,
 
     return env, episodes, Q
 
-def nstep_sarsa_single_stock(env: StockPortfolioEnv, num_episodes: int, gamma: float, epsilon: float, step_size: float, n: int, stock: int = 0, q: Dict = None):
+def nstep_sarsa_single_stock(env: StockPortfolioEnv, num_episodes: int, gamma: float, epsilon: float, step_size: float, n: int, stock: int = 0, aggressive: bool = False, q: Dict = None):
     # Initialize Q
     if q is None:
         Q = defaultdict(lambda: np.zeros(len(PortfolioAction)))
     else:
-        Q = Q
+        Q = q
     # Initialize pi
     policy = create_epsilon_policy(Q, epsilon)
     # Initialize trainsition data structures
@@ -288,7 +288,7 @@ def nstep_sarsa_single_stock(env: StockPortfolioEnv, num_episodes: int, gamma: f
         G = 0
         while True:
             if step < t_ep:
-                percent = update_single_stock_percent(percent, A)
+                percent = update_single_stock_percent(percent, A, aggresive=aggressive)
                 portfolio_breakdown = np.zeros(28)
                 portfolio_breakdown[stock] = percent
                 next_state, reward, done, _, _ = env.step(portfolio_breakdown)
